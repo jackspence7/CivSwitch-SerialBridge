@@ -93,6 +93,10 @@ The ESP32 runs a soft AP with DHCP, a DNS server (resolves all queries to itself
 
 When you run `send_serial.py`, it sends the payload over USB serial to the ESP32 with a small header (`SEND <ip> <port> <length>`). The ESP32 opens a TCP connection to the Switch on its own Wi-Fi network, sends the payload, does a TCP half-close (so the loader knows the payload is complete), reads back the response, and prints it over serial.
 
+## Raspberry Pi version
+
+No ESP32? The [Pi version](pi-bridge) runs the whole bridge on a Raspberry Pi — the Pi hosts the air-gapped network and sends payloads directly, no PC or serial needed.
+
 ## License
 
 MIT
