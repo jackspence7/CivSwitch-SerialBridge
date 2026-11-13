@@ -97,6 +97,10 @@ When you run `send_serial.py`, it sends the payload over USB serial to the ESP32
 
 No ESP32? The [Pi version](pi-bridge) runs the whole bridge on a Raspberry Pi — the Pi hosts the air-gapped network and sends payloads directly, no PC or serial needed.
 
+## Linux (wired) version
+
+Connecting the Switch handheld straight to a Linux box over USB-Ethernet (no dock, no Wi-Fi)? The [Linux bridge](linux-bridge) gives the wired interface a static IP, runs a catch-all DNS, and spoofs Nintendo's connectivity-check on `:80` so the console joins the wired link without a captive-portal popup. The connectivity-check responses are adapted from [90DNS](https://github.com/Thesola10/90dns) (GPL-2.0-or-later) via [fernando-granco/switch2-homebrew](https://github.com/fernando-granco/switch2-homebrew) (MIT), same as the ESP32 and Pi builds.
+
 ## License
 
 MIT
