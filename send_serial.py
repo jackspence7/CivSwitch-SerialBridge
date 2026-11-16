@@ -11,6 +11,7 @@ Requires: pip install pyserial
 """
 import argparse
 import glob
+import os
 import platform
 import sys
 import time
@@ -48,15 +49,22 @@ def find_esp32_port():
 
 
 def send_via_serial(serial_port, switch_ip, switch_port, js_code):
-    ser = serial.Serial(serial_port, 115200, timeout=1)
+    payload = js_code.encode("utf-8")
+    # 115200 8N1 ~11520 B/s; scale timeout with payload so large sends don't false-timeout.
+    write_timeout = max(5, len(payload) / 11520 + 10)
+    ser = serial.serial_for_url(serial_port, 115200, timeout=1, write_timeout=write_timeout)
     time.sleep(0.5)
     ser.reset_input_buffer()
 
-    payload = js_code.encode("utf-8")
     cmd = f"SEND {switch_ip} {switch_port} {len(payload)}\n"
-    ser.write(cmd.encode())
-    time.sleep(0.1)
-    ser.write(payload)
+    try:
+        ser.write(cmd.encode())
+        time.sleep(0.1)
+        ser.write(payload)
+    except serial.SerialTimeoutException:
+        print(f"ERROR: write to {serial_port} timed out.")
+        ser.close()
+        sys.exit(1)
     ser.flush()
 
     output = []
@@ -81,7 +89,9 @@ def main():
     ap.add_argument("args", nargs="+", help="[tcp_port] payload.js")
     args = ap.parse_args()
 
-    serial_port = args.port or find_esp32_port()
+    serial_port = (args.port or os.environ.get("SERIAL_URL")
+                   or os.environ.get("SERIAL_PORT") or find_esp32_port())
+    # shortcut: socket:// URLs skip find_esp32_port validation, upgrade to explicit --port check if misleading errors appear.
     if not serial_port:
         print("ERROR: Can't find the ESP32. Use --port to specify it.")
         print("  Mac:     --port /dev/cu.usbserial-XXXX")

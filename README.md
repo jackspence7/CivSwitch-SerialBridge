@@ -64,6 +64,51 @@ The default TCP port is 9026. You can specify a different one:
 python3 send_serial.py 192.168.4.2 9027 payload.js
 ```
 
+## Docker
+
+Needs Docker only (no compose file — run one command per send). Build once:
+
+```sh
+docker build -t civswitch-sender .
+```
+
+Port order: `--port`, then `SERIAL_URL`, then `SERIAL_PORT`, then auto-detect. Payload files live on your host, so mount them (image `WORKDIR` is `/app`).
+
+Linux: pass the USB device through. Prefer the stable `/dev/serial/by-id/...` host path, mapped to the container name you pass via `--port` (defaults to `/dev/ttyUSB0`):
+
+```sh
+docker run --rm --device=/dev/ttyUSB0:/dev/ttyUSB0 --group-add dialout -v "$(pwd):/payloads" civswitch-sender --port /dev/ttyUSB0 192.168.4.2 /payloads/payload.js
+# stable-path variant: --device=/dev/serial/by-id/usb-XXXX:/dev/ttyUSB0 --port /dev/ttyUSB0
+```
+
+Windows: Docker can't pass `COMx` through. For the `socket://` sender below, expose the port as a raw TCP stream with a ser2net/socat bridge, e.g.:
+
+```sh
+socat TCP-LISTEN:5000,fork,max-children=1,reuseaddr FILE:\\.\COM3,raw,echo=0,b115200
+docker run --rm --add-host=host.docker.internal:host-gateway -e SERIAL_URL=socket://host.docker.internal:5000 -v "${PWD}:/payloads" civswitch-sender 192.168.4.2 /payloads/payload.js
+```
+Git Bash: disable MSYS path conversion and pass a Windows host path (container path unchanged):
+```sh
+MSYS_NO_PATHCONV=1 docker run --rm --add-host=host.docker.internal:host-gateway -e SERIAL_URL=socket://host.docker.internal:5000 -v "$(pwd -W):/payloads" civswitch-sender 192.168.4.2 /payloads/payload.js
+```
+Separate workflow: [usbipd-win](https://github.com/dorssel/usbipd-win) attaches the USB device to the Desktop VM for `--device` use instead of `socket://`.
+Git Bash/Cygwin: Bash strips backslashes — use `FILE:/dev/ttyS2,raw,echo=0,b115200` for COM3 instead.
+
+Firewall: the listener is on all interfaces — keep port 5000 blocked from LAN and kill socat after the send. No `bind=` here: the container arrives via the bridge gateway, not loopback, so `bind=127.0.0.1` would break it.
+
+macOS: Docker Desktop has no official USB passthrough (use USB/IP per Docker docs). OrbStack may pass an existing node via `--device`, but the `/dev/cu.*` name changes per plug and fails when unplugged — the TCP bridge below is the reliable path:
+
+```sh
+socat TCP-LISTEN:5000,reuseaddr,fork,max-children=1 FILE:/dev/cu.usbserial-0001,raw,echo=0,b115200
+docker run --rm --add-host=host.docker.internal:host-gateway -e SERIAL_URL=socket://host.docker.internal:5000 -v "$(pwd):/payloads" civswitch-sender 192.168.4.2 /payloads/payload.js
+```
+
+Firewall: same as Windows — listener is on all interfaces, keep port 5000 blocked from LAN and kill socat after the send.
+
+For dev on Mac/Windows, native `pip install -r requirements.txt` is usually simpler.
+
+Pi/Linux bridges are intentionally not dockerized — they need systemd, dnsmasq, NetworkManager, host AP, and ports 53/80. Run them natively via `setup.sh`.
+
 ## Serial commands
 
 You can also talk to the ESP32 directly over serial (115200 baud):
